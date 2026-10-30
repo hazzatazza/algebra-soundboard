@@ -151,9 +151,6 @@
         <label for="master-volume">Volume:</label>
         <input type="range" id="master-volume" min="0" max="1" step="0.01" value="0.8">
         <button class="btn-stop" id="stop-all">Stop All Sounds</button>
-        <!-- File input for selecting a local directory -->
-        <input type="file" id="folder-input" webkitdirectory directory multiple style="display: none;">
-        <button class="btn-stop" style="background-color: var(--accent-color);" onclick="document.getElementById('folder-input').click()">Load Local Folder</button>
     </div>
 
     <div class="soundboard-grid" id="grid">
@@ -164,24 +161,42 @@
         const grid = document.getElementById('grid');
         const volumeControl = document.getElementById('master-volume');
         const stopAllBtn = document.getElementById('stop-all');
-        const folderInput = document.getElementById('folder-input');
         const activeAudios = [];
 
-        // Preload button state images
+        // Add all your sound filenames from the sounds/ folder here:
+        const soundFiles = [
+            'sound1.mp3',
+            'sound2.mp3',
+            'sound3.mp3',
+            'sound4.mp3',
+            'sound5.mp3',
+            'sound6.mp3',
+            'sound7.mp3',
+            'sound8.mp3'
+        ];
+
+        // Button state images (relative paths)
         const imgUpSrc = 'up.png';
         const imgDownSrc = 'down.png';
 
+        // Preload button state images
         const preloadUp = new Image();
         preloadUp.src = imgUpSrc;
         const preloadDown = new Image();
         preloadDown.src = imgDownSrc;
 
+        // Clean label helper: converts 'my_cool-sound.mp3' -> 'My Cool Sound'
         function formatName(filename) {
             const nameWithoutExt = filename.substring(0, filename.lastIndexOf('.')) || filename;
-            return nameWithoutExt.replace(/[-_]/g, ' ');
+            return nameWithoutExt
+                .replace(/[-_]/g, ' ')
+                .replace(/\b\w/g, char => char.toUpperCase());
         }
 
-        function createSoundButton(title, audioSrc) {
+        function createSoundButton(filename, index) {
+            const title = formatName(filename);
+            const audioSrc = `sounds/${filename}`;
+
             const btn = document.createElement('button');
             btn.className = 'sound-button';
             btn.setAttribute('aria-label', `Play ${title}`);
@@ -194,7 +209,7 @@
             img.src = imgUpSrc;
             img.alt = '';
 
-            // Handle image load errors gracefully by showing a styled fallback
+            // Handle image load error gracefully with a styled fallback button
             img.onerror = () => {
                 imgContainer.innerHTML = `<div class="fallback-button">🔊</div>`;
             };
@@ -203,25 +218,28 @@
 
             const label = document.createElement('span');
             label.className = 'sound-label';
-            label.textContent = title;
+            
+            // Assign keyboard shortcut (keys 1-9 for first 9 sounds)
+            const shortcutKey = index < 9 ? (index + 1) : null;
+            label.textContent = shortcutKey ? `[${shortcutKey}] ${title}` : title;
 
             btn.appendChild(imgContainer);
             btn.appendChild(label);
 
             const audio = new Audio(audioSrc);
 
-            // Image swapping interaction logic
+            // Press state visual swap
             const setPressedState = () => {
-                if (img.parentNode) img.src = imgDownSrc;
+                if (img.parentNode && img.tagName === 'IMG') img.src = imgDownSrc;
                 btn.classList.add('active');
             };
 
             const setReleasedState = () => {
-                if (img.parentNode) img.src = imgUpSrc;
+                if (img.parentNode && img.tagName === 'IMG') img.src = imgUpSrc;
                 btn.classList.remove('active');
             };
 
-            // Mouse & Touch events
+            // Event Listeners for click, hold & touch
             btn.addEventListener('mousedown', setPressedState);
             btn.addEventListener('mouseup', setReleasedState);
             btn.addEventListener('mouseleave', setReleasedState);
@@ -233,11 +251,10 @@
             });
             btn.addEventListener('touchend', setReleasedState);
 
-            // Audio Playback
             function playSound() {
                 audio.currentTime = 0;
                 audio.volume = volumeControl.value;
-                audio.play().catch(err => console.log('Audio playback prevented or failed:', err));
+                audio.play().catch(err => console.log(`Audio error for ${filename}:`, err));
                 
                 if (!activeAudios.includes(audio)) {
                     activeAudios.push(audio);
@@ -246,72 +263,40 @@
 
             btn.addEventListener('click', playSound);
 
-            return btn;
+            return { btn, playSound, setPressedState, setReleasedState, shortcutKey };
         }
 
-        function renderSounds(soundList) {
-            grid.innerHTML = '';
-            if (soundList.length === 0) {
-                grid.innerHTML = '<p style="grid-column: 1/-1; text-align: center; color: #aaa;">No MP3 files found. Please click "Load Local Folder" to select your sounds folder.</p>';
-                return;
-            }
-            soundList.forEach(item => {
-                const button = createSoundButton(item.title, item.src);
-                grid.appendChild(button);
-            });
-        }
-
-        // 1. Try to automatically scan 'sounds/' directory if hosted on a server with directory listing
-        async function autoDiscoverSounds() {
-            try {
-                const response = await fetch('sounds/');
-                if (!response.ok) throw new Error('Directory indexing not available');
-                const text = await response.text();
-                
-                // Parse links from directory index HTML
-                const parser = new DOMParser();
-                const doc = parser.parseFromString(text, 'text/html');
-                const links = Array.from(doc.querySelectorAll('a'));
-                
-                const mp3Files = links
-                    .map(a => a.getAttribute('href'))
-                    .filter(href => href && href.toLowerCase().endsWith('.mp3'))
-                    .map(href => {
-                        const filename = href.split('/').pop();
-                        return {
-                            title: formatName(decodeURIComponent(filename)),
-                            src: `sounds/${filename}`
-                        };
-                    });
-
-                if (mp3Files.length > 0) {
-                    renderSounds(mp3Files);
-                } else {
-                    renderSounds([]);
-                }
-            } catch (err) {
-                console.log('Auto-discovery from web server failed:', err);
-                renderSounds([]);
-            }
-        }
-
-        // 2. Local folder picker event listener
-        folderInput.addEventListener('change', (e) => {
-            const files = Array.from(e.target.files);
-            const mp3Files = files
-                .filter(file => file.name.toLowerCase().endsWith('.mp3'))
-                .map(file => ({
-                    title: formatName(file.name),
-                    src: URL.createObjectURL(file)
-                }));
-
-            renderSounds(mp3Files);
+        // Render all buttons
+        const buttonObjects = soundFiles.map((file, idx) => {
+            const btnObj = createSoundButton(file, idx);
+            grid.appendChild(btnObj.btn);
+            return btnObj;
         });
 
-        // Initialize sound discovery
-        autoDiscoverSounds();
+        // Keyboard Shortcut Support (1-9)
+        window.addEventListener('keydown', (e) => {
+            if (e.repeat) return;
+            const keyNum = parseInt(e.key, 10);
+            if (!isNaN(keyNum) && keyNum >= 1 && keyNum <= 9) {
+                const targetBtn = buttonObjects.find(b => b.shortcutKey === keyNum);
+                if (targetBtn) {
+                    targetBtn.setPressedState();
+                    targetBtn.playSound();
+                }
+            }
+        });
 
-        // Stop all audio
+        window.addEventListener('keyup', (e) => {
+            const keyNum = parseInt(e.key, 10);
+            if (!isNaN(keyNum) && keyNum >= 1 && keyNum <= 9) {
+                const targetBtn = buttonObjects.find(b => b.shortcutKey === keyNum);
+                if (targetBtn) {
+                    targetBtn.setReleasedState();
+                }
+            }
+        });
+
+        // Stop all sounds handler
         stopAllBtn.addEventListener('click', () => {
             activeAudios.forEach(audio => {
                 audio.pause();
@@ -320,7 +305,7 @@
             activeAudios.length = 0;
         });
 
-        // Volume control adjustment for actively playing sounds
+        // Volume control adjustment for playing sounds
         volumeControl.addEventListener('input', (e) => {
             activeAudios.forEach(audio => {
                 audio.volume = e.target.value;
