@@ -1,316 +1,128 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Soundboard</title>
-    <style>
-        :root {
-            --bg-color: #1a1a24;
-            --card-bg: #262636;
-            --text-color: #ffffff;
-            --accent-color: #6c5ce7;
-        }
-
-        * {
-            box-sizing: border-box;
-            user-select: none;
-            -webkit-user-select: none;
-        }
-
-        body {
-            margin: 0;
-            padding: 2rem;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-
-        header {
-            text-align: center;
-            margin-bottom: 2rem;
-        }
-
-        h1 {
-            margin: 0 0 0.5rem 0;
-            font-size: 2.5rem;
-            letter-spacing: 1px;
-        }
-
-        .controls {
-            display: flex;
-            gap: 1rem;
-            align-items: center;
-            background: var(--card-bg);
-            padding: 0.75rem 1.5rem;
-            border-radius: 50px;
-            box-shadow: 0 8px 16px rgba(0,0,0,0.3);
-            margin-bottom: 2rem;
-        }
-
-        .controls label {
-            font-size: 0.9rem;
-            font-weight: bold;
-        }
-
-        .controls input[type="range"] {
-            accent-color: var(--accent-color);
-            cursor: pointer;
-        }
-
-        .btn-stop {
-            background: #e74c3c;
-            color: white;
-            border: none;
-            padding: 0.5rem 1rem;
-            border-radius: 20px;
-            cursor: pointer;
-            font-weight: bold;
-            transition: background 0.2s;
-        }
-
-        .btn-stop:hover {
-            background: #c0392b;
-        }
-
-        .soundboard-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-            gap: 1.5rem;
-            width: 100%;
-            max-width: 900px;
-            padding: 1rem;
-        }
-
-        .sound-button {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            cursor: pointer;
-            background: none;
-            border: none;
-            outline: none;
-            padding: 0;
-            position: relative;
-        }
-
-        .button-img-container {
-            width: 100px;
-            height: 100px;
-            position: relative;
-        }
-
-        .button-img {
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
-            pointer-events: none;
-            transition: transform 0.05s ease;
-        }
-
-        .sound-label {
-            margin-top: 0.5rem;
-            font-size: 0.9rem;
-            color: #dcdde1;
-            text-align: center;
-            word-break: break-word;
-            max-width: 120px;
-        }
-
-        /* Fallback styling if images are missing */
-        .fallback-button {
-            width: 100px;
-            height: 100px;
-            background: var(--accent-color);
-            border-radius: 16px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 6px 0 #4b38b3;
-            transition: all 0.05s ease;
-        }
-
-        .sound-button:active .fallback-button,
-        .sound-button.active .fallback-button {
-            transform: translateY(6px);
-            box-shadow: 0 0 0 #4b38b3;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <title>Soundboard</title>
+  <style>
+    body {
+      background: #1e1e24;
+      color: white;
+      font-family: sans-serif;
+      text-align: center;
+      margin: 0;
+      padding: 20px;
+    }
+    h1 {
+      margin-bottom: 10px;
+    }
+    #searchInput {
+      padding: 10px;
+      width: 300px;
+      max-width: 90%;
+      font-size: 16px;
+      border-radius: 8px;
+      border: 1px solid #444;
+      background: #2a2a32;
+      color: white;
+      margin-bottom: 20px;
+    }
+    #soundboard {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 15px;
+      justify-content: center;
+      padding: 20px;
+    }
+    .sound-button {
+      width: 120px;
+      height: 120px;
+      background-image: url('up.png');
+      background-size: cover;
+      background-position: center;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      padding-bottom: 12px;
+      color: white;
+      font-weight: bold;
+      text-shadow: 1px 1px 3px black;
+      font-size: 13px;
+      text-align: center;
+      padding-left: 5px;
+      padding-right: 5px;
+      overflow: hidden;
+      word-break: break-word;
+    }
+    /* Active / Clicked State */
+    .sound-button:active, .sound-button.active {
+      background-image: url('down.png') !important;
+    }
+  </style>
+  <script src="sounds.js" type="module" defer></script>
 </head>
 <body>
+  <h1>Soundboard</h1>
+  <input type="text" id="searchInput" placeholder="Search sounds...">
+  <div id="soundboard">Loading sounds...</div>
 
-    <header>
-        <h1>Soundboard</h1>
-    </header>
+  <script type="module">
+    import { sounds } from './sounds.js';
 
-    <div class="controls">
-        <label for="master-volume">Volume:</label>
-        <input type="range" id="master-volume" min="0" max="1" step="0.01" value="0.8">
-        <button class="btn-stop" id="stop-all">Stop All Sounds</button>
-    </div>
+    const soundboard = document.getElementById('soundboard');
+    const searchInput = document.getElementById('searchInput');
 
-    <div class="soundboard-grid" id="grid">
-        <!-- Buttons generated dynamically -->
-    </div>
+    function renderButtons(filterText = '') {
+      soundboard.innerHTML = '';
+      
+      const filtered = sounds.filter(filename => 
+        filename.toLowerCase().includes(filterText.toLowerCase())
+      );
 
-    <script>
-        const grid = document.getElementById('grid');
-        const volumeControl = document.getElementById('master-volume');
-        const stopAllBtn = document.getElementById('stop-all');
-        const activeAudios = [];
+      if (filtered.length === 0) {
+        soundboard.innerHTML = 'No sounds found.';
+        return;
+      }
 
-        // Add all your sound filenames from the sounds/ folder here:
-        const soundFiles = [
-            'sound1.mp3',
-            'sound2.mp3',
-            'sound3.mp3',
-            'sound4.mp3',
-            'sound5.mp3',
-            'sound6.mp3',
-            'sound7.mp3',
-            'sound8.mp3'
-        ];
+      filtered.forEach(filename => {
+        const btn = document.createElement('button');
+        btn.className = 'sound-button';
+        
+        // Remove file extension for clean button text display
+        const displayName = filename.replace(/\.[^/.]+$/, "");
+        btn.textContent = displayName;
 
-        // Button state images (relative paths)
-        const imgUpSrc = 'up.png';
-        const imgDownSrc = 'down.png';
+        const audio = new Audio(`sounds/${filename}`);
 
-        // Preload button state images
-        const preloadUp = new Image();
-        preloadUp.src = imgUpSrc;
-        const preloadDown = new Image();
-        preloadDown.src = imgDownSrc;
+        // Handle visual click states for mouse and touch
+        const setDown = () => btn.classList.add('active');
+        const setUp = () => btn.classList.remove('active');
 
-        // Clean label helper: converts 'my_cool-sound.mp3' -> 'My Cool Sound'
-        function formatName(filename) {
-            const nameWithoutExt = filename.substring(0, filename.lastIndexOf('.')) || filename;
-            return nameWithoutExt
-                .replace(/[-_]/g, ' ')
-                .replace(/\b\w/g, char => char.toUpperCase());
-        }
+        btn.addEventListener('mousedown', setDown);
+        btn.addEventListener('mouseup', setUp);
+        btn.addEventListener('mouseleave', setUp);
+        
+        btn.addEventListener('touchstart', setDown);
+        btn.addEventListener('touchend', setUp);
 
-        function createSoundButton(filename, index) {
-            const title = formatName(filename);
-            const audioSrc = `sounds/${filename}`;
-
-            const btn = document.createElement('button');
-            btn.className = 'sound-button';
-            btn.setAttribute('aria-label', `Play ${title}`);
-
-            const imgContainer = document.createElement('div');
-            imgContainer.className = 'button-img-container';
-
-            const img = document.createElement('img');
-            img.className = 'button-img';
-            img.src = imgUpSrc;
-            img.alt = '';
-
-            // Handle image load error gracefully with a styled fallback button
-            img.onerror = () => {
-                imgContainer.innerHTML = `<div class="fallback-button">🔊</div>`;
-            };
-
-            imgContainer.appendChild(img);
-
-            const label = document.createElement('span');
-            label.className = 'sound-label';
-            
-            // Assign keyboard shortcut (keys 1-9 for first 9 sounds)
-            const shortcutKey = index < 9 ? (index + 1) : null;
-            label.textContent = shortcutKey ? `[${shortcutKey}] ${title}` : title;
-
-            btn.appendChild(imgContainer);
-            btn.appendChild(label);
-
-            const audio = new Audio(audioSrc);
-
-            // Press state visual swap
-            const setPressedState = () => {
-                if (img.parentNode && img.tagName === 'IMG') img.src = imgDownSrc;
-                btn.classList.add('active');
-            };
-
-            const setReleasedState = () => {
-                if (img.parentNode && img.tagName === 'IMG') img.src = imgUpSrc;
-                btn.classList.remove('active');
-            };
-
-            // Event Listeners for click, hold & touch
-            btn.addEventListener('mousedown', setPressedState);
-            btn.addEventListener('mouseup', setReleasedState);
-            btn.addEventListener('mouseleave', setReleasedState);
-
-            btn.addEventListener('touchstart', (e) => {
-                e.preventDefault();
-                setPressedState();
-                playSound();
-            });
-            btn.addEventListener('touchend', setReleasedState);
-
-            function playSound() {
-                audio.currentTime = 0;
-                audio.volume = volumeControl.value;
-                audio.play().catch(err => console.log(`Audio error for ${filename}:`, err));
-                
-                if (!activeAudios.includes(audio)) {
-                    activeAudios.push(audio);
-                }
-            }
-
-            btn.addEventListener('click', playSound);
-
-            return { btn, playSound, setPressedState, setReleasedState, shortcutKey };
-        }
-
-        // Render all buttons
-        const buttonObjects = soundFiles.map((file, idx) => {
-            const btnObj = createSoundButton(file, idx);
-            grid.appendChild(btnObj.btn);
-            return btnObj;
+        // Play audio on click
+        btn.addEventListener('click', () => {
+          audio.currentTime = 0;
+          audio.play().catch(err => console.log("Playback blocked:", err));
         });
 
-        // Keyboard Shortcut Support (1-9)
-        window.addEventListener('keydown', (e) => {
-            if (e.repeat) return;
-            const keyNum = parseInt(e.key, 10);
-            if (!isNaN(keyNum) && keyNum >= 1 && keyNum <= 9) {
-                const targetBtn = buttonObjects.find(b => b.shortcutKey === keyNum);
-                if (targetBtn) {
-                    targetBtn.setPressedState();
-                    targetBtn.playSound();
-                }
-            }
-        });
+        soundboard.appendChild(btn);
+      });
+    }
 
-        window.addEventListener('keyup', (e) => {
-            const keyNum = parseInt(e.key, 10);
-            if (!isNaN(keyNum) && keyNum >= 1 && keyNum <= 9) {
-                const targetBtn = buttonObjects.find(b => b.shortcutKey === keyNum);
-                if (targetBtn) {
-                    targetBtn.setReleasedState();
-                }
-            }
-        });
+    // Initial render
+    renderButtons();
 
-        // Stop all sounds handler
-        stopAllBtn.addEventListener('click', () => {
-            activeAudios.forEach(audio => {
-                audio.pause();
-                audio.currentTime = 0;
-            });
-            activeAudios.length = 0;
-        });
-
-        // Volume control adjustment for playing sounds
-        volumeControl.addEventListener('input', (e) => {
-            activeAudios.forEach(audio => {
-                audio.volume = e.target.value;
-            });
-        });
-    </script>
+    // Live search filter listener
+    searchInput.addEventListener('input', (e) => {
+      renderButtons(e.target.value);
+    });
+  </script>
 </body>
 </html>
