@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Soundboard</title>
+    <style>
+        :root {
+            --bg-color: #1a1a24;
+            --card-bg: #262636;
+            --text-color: #ffffff;
+            --accent-color: #6c5ce7;
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body {
+            margin: 0;
+            padding: 2rem;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        h1 {
+            margin: 0 0 0.5rem 0;
+            font-size: 2.5rem;
+            letter-spacing: 1px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+            background: var(--card-bg);
+            padding: 0.75rem 1.5rem;
+            border-radius: 50px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.3);
+            margin-bottom: 2rem;
+        }
+
+        .controls label {
+            font-size: 0.9rem;
+            font-weight: bold;
+        }
+
+        .controls input[type="range"] {
+            accent-color: var(--accent-color);
+            cursor: pointer;
+        }
+
+        .btn-stop {
+            background: #e74c3c;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+
+        .btn-stop:hover {
+            background: #c0392b;
+        }
+
+        .soundboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+            gap: 1.5rem;
+            width: 100%;
+            max-width: 900px;
+            padding: 1rem;
+        }
+
+        .sound-button {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            cursor: pointer;
+            background: none;
+            border: none;
+            outline: none;
+            padding: 0;
+            position: relative;
+        }
+
+        .button-img-container {
+            width: 100px;
+            height: 100px;
+            position: relative;
+        }
+
+        .button-img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            pointer-events: none;
+            transition: transform 0.05s ease;
+        }
+
+        .sound-label {
+            margin-top: 0.5rem;
+            font-size: 0.9rem;
+            color: #dcdde1;
+            text-align: center;
+            word-break: break-word;
+            max-width: 120px;
+        }
+
+        /* Fallback styling if images are missing */
+        .fallback-button {
+            width: 100px;
+            height: 100px;
+            background: var(--accent-color);
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 6px 0 #4b38b3;
+            transition: all 0.05s ease;
+        }
+
+        .sound-button:active .fallback-button,
+        .sound-button.active .fallback-button {
+            transform: translateY(6px);
+            box-shadow: 0 0 0 #4b38b3;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Soundboard</h1>
+    </header>
+
+    <div class="controls">
+        <label for="master-volume">Volume:</label>
+        <input type="range" id="master-volume" min="0" max="1" step="0.01" value="0.8">
+        <button class="btn-stop" id="stop-all">Stop All Sounds</button>
+    </div>
+
+    <div class="soundboard-grid" id="grid">
+        <!-- Buttons generated dynamically -->
+    </div>
+
+    <script>
+        // List your sound files located in the sounds/ directory here
+        const soundFiles = [
+            'sound1.mp3',
+            'sound2.wav',
+            'sound3.mp3',
+            'sound4.ogg',
+            'sound5.mp3',
+            'sound6.wav',
+            'sound7.mp3',
+            'sound8.mp3'
+        ];
+
+        const grid = document.getElementById('grid');
+        const volumeControl = document.getElementById('master-volume');
+        const stopAllBtn = document.getElementById('stop-all');
+        const activeAudios = [];
+
+        // Preload button state images
+        const imgUpSrc = 'up.png';
+        const imgDownSrc = 'down.png';
+
+        const preloadUp = new Image();
+        preloadUp.src = imgUpSrc;
+        const preloadDown = new Image();
+        preloadDown.src = imgDownSrc;
+
+        function formatName(filename) {
+            const nameWithoutExt = filename.substring(0, filename.lastIndexOf('.')) || filename;
+            return nameWithoutExt.replace(/[-_]/g, ' ');
+        }
+
+        function createSoundButton(filename, index) {
+            const btn = document.createElement('button');
+            btn.className = 'sound-button';
+            btn.setAttribute('aria-label', `Play ${formatName(filename)}`);
+
+            const imgContainer = document.createElement('div');
+            imgContainer.className = 'button-img-container';
+
+            const img = document.createElement('img');
+            img.className = 'button-img';
+            img.src = imgUpSrc;
+            img.alt = '';
+
+            // Handle image load errors gracefully by showing a styled fallback
+            img.onerror = () => {
+                imgContainer.innerHTML = `<div class="fallback-button">🔊</div>`;
+            };
+
+            imgContainer.appendChild(img);
+
+            const label = document.createElement('span');
+            label.className = 'sound-label';
+            label.textContent = formatName(filename);
+
+            btn.appendChild(imgContainer);
+            btn.appendChild(label);
+
+            const audio = new Audio(`sounds/${filename}`);
+
+            // Image swapping interaction logic
+            const setPressedState = () => {
+                if (img.parentNode) img.src = imgDownSrc;
+                btn.classList.add('active');
+            };
+
+            const setReleasedState = () => {
+                if (img.parentNode) img.src = imgUpSrc;
+                btn.classList.remove('active');
+            };
+
+            // Mouse & Touch events
+            btn.addEventListener('mousedown', setPressedState);
+            btn.addEventListener('mouseup', setReleasedState);
+            btn.addEventListener('mouseleave', setReleasedState);
+
+            btn.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                setPressedState();
+                playSound();
+            });
+            btn.addEventListener('touchend', setReleasedState);
+
+            // Audio Playback
+            function playSound() {
+                audio.currentTime = 0;
+                audio.volume = volumeControl.value;
+                audio.play().catch(err => console.log('Audio playback prevented or failed:', err));
+                
+                if (!activeAudios.includes(audio)) {
+                    activeAudios.push(audio);
+                }
+            }
+
+            btn.addEventListener('click', playSound);
+
+            return btn;
+        }
+
+        // Populate Soundboard
+        soundFiles.forEach((file, index) => {
+            const button = createSoundButton(file, index);
+            grid.appendChild(button);
+        });
+
+        // Stop all audio
+        stopAllBtn.addEventListener('click', () => {
+            activeAudios.forEach(audio => {
+                audio.pause();
+                audio.currentTime = 0;
+            });
+            activeAudios.length = 0;
+        });
+
+        // Volume control adjustment for actively playing sounds
+        volumeControl.addEventListener('input', (e) => {
+            activeAudios.forEach(audio => {
+                audio.volume = e.target.value;
+            });
+        });
+    </script>
+</body>
+</html>
