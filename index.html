@@ -151,6 +151,9 @@
         <label for="master-volume">Volume:</label>
         <input type="range" id="master-volume" min="0" max="1" step="0.01" value="0.8">
         <button class="btn-stop" id="stop-all">Stop All Sounds</button>
+        <!-- File input for selecting a local directory -->
+        <input type="file" id="folder-input" webkitdirectory directory multiple style="display: none;">
+        <button class="btn-stop" style="background-color: var(--accent-color);" onclick="document.getElementById('folder-input').click()">Load Local Folder</button>
     </div>
 
     <div class="soundboard-grid" id="grid">
@@ -158,21 +161,10 @@
     </div>
 
     <script>
-        // List your sound files located in the sounds/ directory here
-        const soundFiles = [
-            'sound1.mp3',
-            'sound2.wav',
-            'sound3.mp3',
-            'sound4.ogg',
-            'sound5.mp3',
-            'sound6.wav',
-            'sound7.mp3',
-            'sound8.mp3'
-        ];
-
         const grid = document.getElementById('grid');
         const volumeControl = document.getElementById('master-volume');
         const stopAllBtn = document.getElementById('stop-all');
+        const folderInput = document.getElementById('folder-input');
         const activeAudios = [];
 
         // Preload button state images
@@ -189,10 +181,10 @@
             return nameWithoutExt.replace(/[-_]/g, ' ');
         }
 
-        function createSoundButton(filename, index) {
+        function createSoundButton(title, audioSrc) {
             const btn = document.createElement('button');
             btn.className = 'sound-button';
-            btn.setAttribute('aria-label', `Play ${formatName(filename)}`);
+            btn.setAttribute('aria-label', `Play ${title}`);
 
             const imgContainer = document.createElement('div');
             imgContainer.className = 'button-img-container';
@@ -211,12 +203,12 @@
 
             const label = document.createElement('span');
             label.className = 'sound-label';
-            label.textContent = formatName(filename);
+            label.textContent = title;
 
             btn.appendChild(imgContainer);
             btn.appendChild(label);
 
-            const audio = new Audio(`sounds/${filename}`);
+            const audio = new Audio(audioSrc);
 
             // Image swapping interaction logic
             const setPressedState = () => {
@@ -257,11 +249,67 @@
             return btn;
         }
 
-        // Populate Soundboard
-        soundFiles.forEach((file, index) => {
-            const button = createSoundButton(file, index);
-            grid.appendChild(button);
+        function renderSounds(soundList) {
+            grid.innerHTML = '';
+            if (soundList.length === 0) {
+                grid.innerHTML = '<p style="grid-column: 1/-1; text-align: center; color: #aaa;">No MP3 files found. Please click "Load Local Folder" to select your sounds folder.</p>';
+                return;
+            }
+            soundList.forEach(item => {
+                const button = createSoundButton(item.title, item.src);
+                grid.appendChild(button);
+            });
+        }
+
+        // 1. Try to automatically scan 'sounds/' directory if hosted on a server with directory listing
+        async function autoDiscoverSounds() {
+            try {
+                const response = await fetch('sounds/');
+                if (!response.ok) throw new Error('Directory indexing not available');
+                const text = await response.text();
+                
+                // Parse links from directory index HTML
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(text, 'text/html');
+                const links = Array.from(doc.querySelectorAll('a'));
+                
+                const mp3Files = links
+                    .map(a => a.getAttribute('href'))
+                    .filter(href => href && href.toLowerCase().endsWith('.mp3'))
+                    .map(href => {
+                        const filename = href.split('/').pop();
+                        return {
+                            title: formatName(decodeURIComponent(filename)),
+                            src: `sounds/${filename}`
+                        };
+                    });
+
+                if (mp3Files.length > 0) {
+                    renderSounds(mp3Files);
+                } else {
+                    renderSounds([]);
+                }
+            } catch (err) {
+                console.log('Auto-discovery from web server failed:', err);
+                renderSounds([]);
+            }
+        }
+
+        // 2. Local folder picker event listener
+        folderInput.addEventListener('change', (e) => {
+            const files = Array.from(e.target.files);
+            const mp3Files = files
+                .filter(file => file.name.toLowerCase().endsWith('.mp3'))
+                .map(file => ({
+                    title: formatName(file.name),
+                    src: URL.createObjectURL(file)
+                }));
+
+            renderSounds(mp3Files);
         });
+
+        // Initialize sound discovery
+        autoDiscoverSounds();
 
         // Stop all audio
         stopAllBtn.addEventListener('click', () => {
